@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { errorHandler, notFound } from "./middleware/error";
 import authRoutes from "./routes/auth.routes";
+import gastosRoutes from "./routes/gastos.routes";
 import ingresosRoutes from "./routes/ingresos.routes";
 import periodosRoutes from "./routes/periodos.routes";
 
@@ -15,6 +16,7 @@ export function createApp() {
   });
 
   app.use("/auth", authRoutes);
+  app.use("/", gastosRoutes);
   app.use("/", ingresosRoutes);
   app.use("/periodos", periodosRoutes);
 
