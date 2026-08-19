@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import { errorHandler, notFound } from "./middleware/error";
 import authRoutes from "./routes/auth.routes";
+import periodosRoutes from "./routes/periodos.routes";
 
 export function createApp() {
   const app = express();
@@ -13,6 +14,7 @@ export function createApp() {
   });
 
   app.use("/auth", authRoutes);
+  app.use("/periodos", periodosRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
