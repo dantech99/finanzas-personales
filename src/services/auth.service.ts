@@ -19,12 +19,12 @@ export async function verifyPassword(
 
 export function signToken(userId: number): string {
   return jwt.sign({ sub: userId }, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn,
+    expiresIn: config.jwtExpiresIn as jwt.SignOptions["expiresIn"],
   });
 }
 
 export function verifyToken(token: string): { sub: number } {
-  return jwt.verify(token, config.jwtSecret) as { sub: number };
+  return jwt.verify(token, config.jwtSecret) as unknown as { sub: number };
 }
 
 export async function login(email: string, password: string) {

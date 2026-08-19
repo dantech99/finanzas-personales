@@ -49,7 +49,7 @@ router.post("/periodos/:mes/:anio/gastos", requireAuth, async (req, res, next) =
 
 router.put("/gastos/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const concepto = parseRequeridoTexto(req.body.concepto, "Concepto");
     const valor = parseMonto(req.body.valor);
     const nota = parseNota(req.body.nota);
@@ -70,7 +70,7 @@ router.put("/gastos/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/gastos/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     await deleteGasto(id);
     res.status(204).end();
   } catch (err) {

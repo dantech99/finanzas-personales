@@ -33,7 +33,7 @@ router.post("/", requireAuth, async (req, res, next) => {
 
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const nombre = parseRequeridoTexto(req.body.nombre, "Nombre");
     const montoTotal = parseMonto(req.body.montoTotal);
     const descripcion = parseNota(req.body.descripcion);
@@ -45,7 +45,7 @@ router.put("/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     await deleteDeuda(id);
     res.status(204).end();
   } catch (err) {

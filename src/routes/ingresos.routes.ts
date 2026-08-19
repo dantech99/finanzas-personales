@@ -37,7 +37,7 @@ router.post("/periodos/:mes/:anio/ingresos", requireAuth, async (req, res, next)
 
 router.put("/ingresos/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     const fuente = parseRequeridoTexto(req.body.fuente, "Fuente");
     const valor = parseMonto(req.body.valor);
     res.json(await updateIngreso(id, fuente, valor));
@@ -48,7 +48,7 @@ router.put("/ingresos/:id", requireAuth, async (req, res, next) => {
 
 router.delete("/ingresos/:id", requireAuth, async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
+    const id = parseInt(String(req.params.id), 10);
     await deleteIngreso(id);
     res.status(204).end();
   } catch (err) {
