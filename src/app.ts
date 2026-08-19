@@ -1,6 +1,8 @@
 import cors from "cors";
 import express from "express";
+import swaggerUi from "swagger-ui-express";
 import { errorHandler, notFound } from "./middleware/error";
+import { swaggerSpec } from "./swagger";
 import authRoutes from "./routes/auth.routes";
 import deudasRoutes from "./routes/deudas.routes";
 import gastosRoutes from "./routes/gastos.routes";
@@ -16,6 +18,8 @@ export function createApp() {
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
   });
+
+  app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
   app.use("/auth", authRoutes);
   app.use("/deudas", deudasRoutes);

@@ -6,6 +6,38 @@ import { prisma } from "../prisma";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /auth/login:
+ *   post:
+ *     summary: Iniciar sesión
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       '200':
+ *         description: Token JWT generado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       '400':
+ *         description: email y password son requeridos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       '401':
+ *         description: Credenciales inválidas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post("/login", async (req, res, next) => {
   try {
     const { email, password } = req.body as {
@@ -22,6 +54,28 @@ router.post("/login", async (req, res, next) => {
   }
 });
 
+/**
+ * @openapi
+ * /auth/me:
+ *   get:
+ *     summary: Obtener el usuario autenticado
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Datos del usuario
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Usuario'
+ *       '401':
+ *         description: Token ausente o inválido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const user = await prisma.usuario.findUnique({
