@@ -1,0 +1,40 @@
+# Verificación de pull requests hacia main.
+# No publica nada ni despliega: solo responde "¿esto se puede mergear?".
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# En un PR solo importa el último commit. Si llegan varios pushes seguidos,
+# cancelamos las corridas viejas para no gastar minutos en código ya superado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  image:
+    name: Verificar que la imagen construye
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Se construye pero NO se publica. `tsc` corre dentro del Dockerfile,
+      # así que este paso cubre a la vez los errores de compilación y las
+      # regresiones del propio Dockerfile: si el artefacto desplegable no se
+      # puede construir, el PR no se mergea.
+      - name: Build de la imagen (sin push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

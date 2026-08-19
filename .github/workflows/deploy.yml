@@ -1,0 +1,155 @@
+# Deploy automático.
+#
+#   push a main -> environment `production` de Dokploy
+#
+# El orden de los jobs ES el mecanismo de seguridad: `deploy` declara
+# `needs: image`, e `image` declara `needs: quality`. Si el type-check o los
+# tests fallan, el job de deploy no llega a ejecutarse nunca.
+#
+# IMPORTANTE: para que esto sea un portón y no un espectador, el auto-deploy
+# del provider Git tiene que estar APAGADO en Dokploy. Si sigue encendido,
+# Dokploy despliega por su cuenta al detectar el push, en paralelo a este
+# pipeline y sin esperar al gate.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Un deploy a la vez. `cancel-in-progress: false` es deliberado: abortar un
+# deploy a mitad de camino deja el ambiente en un estado que nadie sabe
+# describir. Preferimos encolar.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  image:
+    name: Construir y publicar imagen
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # necesario para publicar en GHCR
+    outputs:
+      rollback-tag: ${{ steps.tag.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # El tag inmutable se calcula acá y de un solo lugar.
+      - name: Calcular tag inmutable
+        id: tag
+        run: echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      # GITHUB_TOKEN alcanza para publicar en el GHCR de la propia organización:
+      # no hace falta crear ni rotar un PAT para el push.
+      - name: Autenticar contra GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calcular tags
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=${{ github.ref_name }}
+            type=raw,value=${{ steps.tag.outputs.sha }}
+      # Resultado: dos tags por deploy.
+      #   `:main`         -> tag MÓVIL, es al que apunta Dokploy.
+      #   `:sha-a1b2c3d`  -> tag INMUTABLE, es el que se usa en rollback.
+
+      - name: Build y push
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Desplegar en Dokploy
+    needs: image
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Disparar deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          APPLICATION_ID: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+        run: |
+          set -euo pipefail
+
+          # Secrets pegados desde la UI de GitHub o cargados con `echo | gh
+          # secret set` suelen traer un \n o espacios de sobra al final. Ese
+          # \n termina metido en el string de la URL y curl lo rechaza con
+          # "URL rejected: Malformed input to a URL function" (error 3), un
+          # mensaje que no dice nada sobre la causa real. Se sanitiza acá en
+          # vez de confiar en que el secret siempre venga limpio.
+          for var in DOKPLOY_URL DOKPLOY_API_KEY APPLICATION_ID; do
+            value="${!var}"
+            value="${value//$'\r'/}"
+            value="${value//$'\n'/}"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            printf -v "$var" '%s' "$value"
+            if [ -z "${!var}" ]; then
+              echo "::error::Falta el secret $var."
+              exit 1
+            fi
+          done
+
+          if [[ "$DOKPLOY_URL" != http://* && "$DOKPLOY_URL" != https://* ]]; then
+            echo "::error::DOKPLOY_URL no tiene esquema (http:// o https://): revisá el secret en Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+          # --fail-with-body no sirve acá: queremos el cuerpo de la respuesta
+          # incluso cuando el status es 4xx, porque Dokploy explica ahí por qué
+          # rechazó el deploy.
+          response=$(curl --silent --show-error \
+            --write-out '\n%{http_code}' \
+            --request POST "${DOKPLOY_URL%/}/api/application.deploy" \
+            --header 'Content-Type: application/json' \
+            --header "x-api-key: ${DOKPLOY_API_KEY}" \
+            --data "{\"applicationId\":\"${APPLICATION_ID}\"}")
+
+          status=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+
+          echo "HTTP $status"
+          echo "$body"
+
+          if [ "$status" -lt 200 ] || [ "$status" -ge 300 ]; then
+            echo "::error::Dokploy rechazó el deploy (HTTP $status)"
+            exit 1
+          fi
+
+      # `application.deploy` ENCOLA el despliegue y responde enseguida: este
+      # workflow en verde significa "Dokploy aceptó la orden", no "la versión
+      # nueva está sana". La verificación de salud y el rollback automático se
+      # configuran del lado de Dokploy.
+      - name: Resumen
+        run: |
+          {
+            echo "### Deploy disparado"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Ambiente | \`production\` |"
+            echo "| Imagen | \`ghcr.io/${{ github.repository }}:${{ needs.image.outputs.rollback-tag }}\` |"
+            echo "| Commit | ${{ github.sha }} |"
+            echo ""
+            echo "Para volver atrás, apuntá Dokploy al tag inmutable de la versión anterior y redesplegá."
+          } >> "$GITHUB_STEP_SUMMARY"

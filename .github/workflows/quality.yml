@@ -1,0 +1,58 @@
+# Gate de calidad. Workflow REUTILIZABLE: no se dispara solo, lo invocan
+# `ci.yml` (en pull requests) y `deploy.yml` (en push a main).
+#
+# Vive en un archivo aparte para que exista UNA sola definición del gate. Si se
+# duplicara en los dos workflows, tarde o temprano divergen y el pipeline que
+# protege producción termina siendo el más flojo de los dos.
+name: Quality gate
+
+on:
+  workflow_call:
+
+jobs:
+  quality:
+    name: Type-check y tests
+    runs-on: ubuntu-latest
+    # Explícito y mínimo: solo leer el código. No depende de cuál sea el
+    # permiso por defecto configurado en la organización.
+    permissions:
+      contents: read
+    # Postgres efímero para los tests de integración. El global-setup de Vitest
+    # crea la BD `finanzas_test` a partir de esta conexión, así que nunca se
+    # toca la BD del VPS.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: finanzas
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/finanzas
+      JWT_SECRET: test-secret-ci
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+          cache: npm
+
+      # --frozen-lockfile: si `package-lock.json` no coincide con
+      # `package.json`, falla en vez de resolver versiones nuevas por su
+      # cuenta. El CI no decide dependencias.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
