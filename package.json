@@ -17,7 +17,7 @@
     "migrate:sqlite": "tsx scripts/migrate-from-sqlite.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
