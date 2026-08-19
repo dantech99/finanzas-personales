@@ -1,0 +1,7 @@
+{
+  "name": "finanzas-api",
+  "description": "Finanzas Personales API",
+  "type": "docker",
+  "buildType": "dockerfile",
+  "dockerfilePath": "Dockerfile"
+}
