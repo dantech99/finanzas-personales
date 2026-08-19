@@ -6,6 +6,7 @@ import deudasRoutes from "./routes/deudas.routes";
 import gastosRoutes from "./routes/gastos.routes";
 import ingresosRoutes from "./routes/ingresos.routes";
 import periodosRoutes from "./routes/periodos.routes";
+import resumenRoutes from "./routes/resumen.routes";
 
 export function createApp() {
   const app = express();
@@ -18,6 +19,7 @@ export function createApp() {
 
   app.use("/auth", authRoutes);
   app.use("/deudas", deudasRoutes);
+  app.use("/", resumenRoutes);
   app.use("/", gastosRoutes);
   app.use("/", ingresosRoutes);
   app.use("/periodos", periodosRoutes);
