@@ -1,4 +1,12 @@
+import { existsSync } from "node:fs";
+import { join, sep } from "node:path";
 import swaggerJsdoc from "swagger-jsdoc";
+
+// En desarrollo (tsx) el código vive en src/, en producción compilado en
+// dist/. El glob debe apuntar al directorio correcto o Swagger no
+// encuentra las anotaciones @openapi y la spec sale sin rutas.
+const inDist = __dirname.includes(`${sep}dist`);
+const routesGlob = join(__dirname, "routes", inDist ? "*.js" : "*.ts");
 
 const options: swaggerJsdoc.Options = {
   definition: {
@@ -191,7 +199,7 @@ const options: swaggerJsdoc.Options = {
       },
     },
   },
-  apis: ["src/routes/*.ts"],
+  apis: [routesGlob],
 };
 
 export const swaggerSpec = swaggerJsdoc(options);
